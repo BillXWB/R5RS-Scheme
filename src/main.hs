@@ -1,13 +1,16 @@
 module Main where
 
-import System.Environment (getArgs)
-
 main :: IO ()
 main = do
-  args <- getArgs
-  print $ calc' args
-  where
-    calc' args = calc (args !! 0) (args !! 1) (args !! 2)
+  lhs <- input "lhs: "
+  op <- input "op: "
+  rhs <- input "rhs: "
+  print $ calc lhs op rhs
+
+input :: String -> IO String
+input hint = do
+  putStr hint
+  getLine
 
 calc :: String -> String -> String -> Float
 calc lhs' op rhs' =
