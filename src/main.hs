@@ -30,9 +30,17 @@ data LispVal
 parseString :: Parser LispVal
 parseString = do
   char '"'
-  x <- many $ noneOf "\""
+  x <- many $ noneOf ['\\', '"'] <|> parseQuote
   char '"'
   return $ String x
+
+parseQuote :: Parser Char
+parseQuote = do
+  char '\\'
+  c <- anyChar
+  return $ case c of
+    '"' -> '"'
+    _ -> error $ "invalid escaped quote: " ++ show c
 
 parseAtom :: Parser LispVal
 parseAtom = do
