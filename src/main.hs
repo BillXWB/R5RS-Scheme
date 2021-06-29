@@ -17,7 +17,7 @@ symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
   Left err -> "No match: " ++ show err
-  Right _ -> "Found value"
+  Right val -> "Found value: " ++ show val
 
 data LispVal
   = Atom String
@@ -26,21 +26,31 @@ data LispVal
   | Number Integer
   | String String
   | Bool Bool
+  deriving (Show)
 
 parseString :: Parser LispVal
 parseString = do
   char '"'
-  x <- many $ noneOf ['\\', '"'] <|> parseQuote
+  x <- many $ noneOf ['\\', '"'] <|> parseEscape
   char '"'
   return $ String x
 
-parseQuote :: Parser Char
-parseQuote = do
+parseEscape :: Parser Char
+parseEscape = do
   char '\\'
   c <- anyChar
   return $ case c of
+    '\'' -> '\''
     '"' -> '"'
-    _ -> error $ "invalid escaped quote: " ++ show c
+    '\\' -> '\\'
+    'a' -> '\a'
+    'b' -> '\b'
+    'f' -> '\f'
+    'n' -> '\n'
+    'r' -> '\r'
+    't' -> '\t'
+    'v' -> '\v'
+    _ -> error $ "invalid escape: " ++ [c]
 
 parseAtom :: Parser LispVal
 parseAtom = do
