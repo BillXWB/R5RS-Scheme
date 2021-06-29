@@ -1,24 +1,17 @@
 module Main where
 
+import System.Environment
+import Text.ParserCombinators.Parsec hiding (spaces)
+
 main :: IO ()
 main = do
-  lhs <- input "lhs: "
-  op <- input "op: "
-  rhs <- input "rhs: "
-  print $ calc lhs op rhs
+  (expr : _) <- getArgs
+  putStrLn $ readExpr expr
 
-input :: String -> IO String
-input hint = do
-  putStr hint
-  getLine
+symbol :: Parser Char
+symbol = oneOf "!#$%&|*+-/:<=>?@^_~"
 
-calc :: String -> String -> String -> Float
-calc lhs' op rhs' =
-  let lhs = read lhs'
-      rhs = read rhs'
-   in case op of
-        "+" -> lhs + rhs
-        "-" -> lhs - rhs
-        "*" -> lhs * rhs
-        "/" -> lhs / rhs
-        _ -> error $ "invalid op: " ++ op
+readExpr :: String -> String
+readExpr input = case parse symbol "lisp" input of
+  Left err -> "No match: " ++ show err
+  Right val -> "Found value"
