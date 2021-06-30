@@ -151,6 +151,21 @@ parseComplex =
         char 'i'
         return $ Complex (toDouble x :+ toDouble y)
 
+parseList :: Parser LispVal
+parseList = List <$> sepBy parseExpr spaces
+
+parseDottedList :: Parser LispVal
+parseDottedList = do
+  head <- endBy parseExpr spaces
+  tail <- char '.' >> spaces >> parseExpr
+  return $ DottedList head tail
+
+parseQuoted :: Parser LispVal
+parseQuoted = do
+  char '\''
+  x <- parseExpr
+  return $ List [Atom "quote", x]
+
 parseExpr :: Parser LispVal
 parseExpr =
   parseAtom
@@ -160,4 +175,10 @@ parseExpr =
     <|> try parseRatio
     <|> try parseNumber
     <|> try parseBool
-    <|> try parseChar
+    <|> parseChar
+    <|> parseQuoted
+    <|> do
+      char '('
+      x <- try parseList <|> parseDottedList
+      char ')'
+      return x
