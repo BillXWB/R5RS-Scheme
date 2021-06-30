@@ -31,6 +31,7 @@ data LispVal
   | Number Integer
   | String String
   | Bool Bool
+  | Char Char
   deriving (Show)
 
 parseString :: Parser LispVal
@@ -56,6 +57,18 @@ parseEscape = do
     't' -> '\t'
     'v' -> '\v'
     _ -> error $ "invalid escape: " ++ [c]
+
+parseChar :: Parser LispVal
+parseChar =
+  let alphabetic = do x <- anyChar; notFollowedBy alphaNum; return x
+   in do
+        try $ string "#\\"
+        x <-
+          try $
+            (string "space" >> return ' ')
+              <|> (string "newline" >> return '\n')
+              <|> alphabetic
+        return $ Char x
 
 parseAtom :: Parser LispVal
 parseAtom = do
@@ -105,4 +118,4 @@ parseHex = do
   return $ Number d
 
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> parseNumber <|> parseBool
+parseExpr = parseAtom <|> parseString <|> parseChar <|> parseNumber <|> parseBool
