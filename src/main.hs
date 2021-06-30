@@ -1,6 +1,6 @@
 module Main where
 
-import Numeric (readHex, readOct)
+import Numeric (readFloat, readHex, readOct)
 import System.Environment (getArgs)
 import Text.ParserCombinators.Parsec hiding (spaces)
 
@@ -29,6 +29,7 @@ data LispVal
   | List [LispVal]
   | DottedList [LispVal] LispVal
   | Number Integer
+  | Float Double
   | String String
   | Bool Bool
   | Char Char
@@ -36,14 +37,14 @@ data LispVal
 
 parseString :: Parser LispVal
 parseString = do
-  try $ char '"'
+  char '"'
   x <- many $ noneOf ['\\', '"'] <|> parseEscape
   char '"'
   return $ String x
 
 parseEscape :: Parser Char
 parseEscape = do
-  try $ char '\\'
+  char '\\'
   c <- anyChar
   return $ case c of
     '\'' -> '\''
@@ -62,7 +63,7 @@ parseChar :: Parser LispVal
 parseChar =
   let alphabetic = do x <- anyChar; notFollowedBy alphaNum; return x
    in do
-        try $ string "#\\"
+        string "#\\"
         x <-
           try $
             (string "space" >> return ' ')
@@ -72,13 +73,13 @@ parseChar =
 
 parseAtom :: Parser LispVal
 parseAtom = do
-  first <- try $ letter <|> symbol
+  first <- letter <|> symbol
   rest <- many $ letter <|> digit <|> symbol
   return $ Atom (first : rest)
 
 parseBool :: Parser LispVal
 parseBool = do
-  try $ char '#'
+  char '#'
   (char 't' >> return (Bool True)) <|> (char 'f' >> return (Bool False))
 
 parseNumber :: Parser LispVal
@@ -117,5 +118,19 @@ parseHex = do
   let [(d, _)] = readHex x
   return $ Number d
 
+parseFloat :: Parser LispVal
+parseFloat = do
+  x <- many1 digit
+  char '.'
+  y <- many1 digit
+  let [(d, _)] = readFloat (x ++ "." ++ y)
+  return $ Float d
+
 parseExpr :: Parser LispVal
-parseExpr = parseAtom <|> parseString <|> parseChar <|> parseNumber <|> parseBool
+parseExpr =
+  parseAtom
+    <|> parseString
+    <|> try parseFloat
+    <|> try parseNumber
+    <|> try parseBool
+    <|> try parseChar
