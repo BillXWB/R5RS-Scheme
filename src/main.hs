@@ -28,7 +28,8 @@ readExpr input = case parse parseExpr "lisp" input of
         v -> show v
 
 data LispVal
-  = Atom String
+  = Nil
+  | Atom String
   | List [LispVal]
   | DottedList [LispVal] LispVal
   | Vector (Array Int LispVal)
@@ -154,13 +155,16 @@ parseComplex =
         return $ Complex (toDouble x :+ toDouble y)
 
 parseList :: Parser LispVal
-parseList = List <$> sepBy parseExpr spaces
-
-parseDottedList :: Parser LispVal
-parseDottedList = do
-  head <- endBy parseExpr spaces
-  tail <- char '.' >> spaces >> parseExpr
-  return $ DottedList head tail
+parseList = between beg end parseList'
+  where
+    beg = char '(' >> skipMany space
+    end = skipMany space >> char ')'
+    parseList' = do
+      heads <- sepEndBy parseExpr spaces
+      tail <- option Nil (char '.' >> spaces >> parseExpr)
+      return $ case tail of
+        Nil -> List heads
+        _ -> DottedList heads tail
 
 parseQuoted :: Parser LispVal
 parseQuoted = do
@@ -182,7 +186,9 @@ parseUnquoted = do
 
 parseVector :: Parser LispVal
 parseVector = do
+  string "#("
   arr <- sepBy parseExpr spaces
+  char ')'
   let vec = listArray (0, length arr - 1) arr
   return $ Vector vec
 
@@ -199,15 +205,5 @@ parseExpr =
     <|> parseQuoted
     <|> parseQuasiquote
     <|> parseUnquoted
-    <|> try
-      ( do
-          string "#("
-          x <- parseVector
-          char ')'
-          return x
-      )
-    <|> do
-      char '('
-      x <- try parseList <|> parseDottedList
-      char ')'
-      return x
+    <|> parseVector
+    <|> parseList
