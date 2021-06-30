@@ -1,5 +1,7 @@
 module Main where
 
+import Data.Complex
+import Data.Ratio
 import Numeric (readFloat, readHex, readOct)
 import System.Environment (getArgs)
 import Text.ParserCombinators.Parsec hiding (spaces)
@@ -30,9 +32,11 @@ data LispVal
   | DottedList [LispVal] LispVal
   | Number Integer
   | Float Double
+  | Ratio Rational
+  | Complex (Complex Double)
   | String String
-  | Bool Bool
   | Char Char
+  | Bool Bool
   deriving (Show)
 
 parseString :: Parser LispVal
@@ -126,11 +130,34 @@ parseFloat = do
   let [(d, _)] = readFloat (x ++ "." ++ y)
   return $ Float d
 
+parseRatio :: Parser LispVal
+parseRatio = do
+  x <- many1 digit
+  char '/'
+  y <- many1 digit
+  let d = read x % read y
+  return $ Ratio d
+
+parseComplex :: Parser LispVal
+parseComplex =
+  let toDouble :: LispVal -> Double
+      toDouble (Float x) = realToFrac x
+      toDouble (Number x) = fromIntegral x
+      toDouble x = error $ "type error: " ++ (head . words $ show x)
+   in do
+        x <- try parseFloat <|> parseDec
+        char '+'
+        y <- try parseFloat <|> parseDec
+        char 'i'
+        return $ Complex (toDouble x :+ toDouble y)
+
 parseExpr :: Parser LispVal
 parseExpr =
   parseAtom
     <|> parseString
+    <|> try parseComplex
     <|> try parseFloat
+    <|> try parseRatio
     <|> try parseNumber
     <|> try parseBool
     <|> try parseChar
