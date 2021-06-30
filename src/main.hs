@@ -1,5 +1,6 @@
 module Main where
 
+import Data.Array
 import Data.Complex
 import Data.Ratio
 import Numeric (readFloat, readHex, readOct)
@@ -30,6 +31,7 @@ data LispVal
   = Atom String
   | List [LispVal]
   | DottedList [LispVal] LispVal
+  | Vector (Array Int LispVal)
   | Number Integer
   | Float Double
   | Ratio Rational
@@ -178,6 +180,12 @@ parseUnquoted = do
   x <- parseExpr
   return $ List [Atom "unquoted", x]
 
+parseVector :: Parser LispVal
+parseVector = do
+  arr <- sepBy parseExpr spaces
+  let vec = listArray (0, length arr - 1) arr
+  return $ Vector vec
+
 parseExpr :: Parser LispVal
 parseExpr =
   parseAtom
@@ -187,10 +195,17 @@ parseExpr =
     <|> try parseRatio
     <|> try parseNumber
     <|> try parseBool
-    <|> parseChar
+    <|> try parseChar
     <|> parseQuoted
     <|> parseQuasiquote
     <|> parseUnquoted
+    <|> try
+      ( do
+          string "#("
+          x <- parseVector
+          char ')'
+          return x
+      )
     <|> do
       char '('
       x <- try parseList <|> parseDottedList
