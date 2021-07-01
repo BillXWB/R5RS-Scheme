@@ -8,9 +8,7 @@ import System.Environment (getArgs)
 import Text.ParserCombinators.Parsec hiding (spaces)
 
 main :: IO ()
-main = do
-  (expr : _) <- getArgs
-  putStrLn $ readExpr expr
+main = getArgs >>= print . eval . readExpr . head
 
 spaces :: Parser ()
 spaces = skipMany1 space
@@ -18,10 +16,10 @@ spaces = skipMany1 space
 symbol :: Parser Char
 symbol = oneOf "!$%&|*+-/:<=>?@^_~"
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case parse parseExpr "lisp" input of
-  Left err -> "No match: " ++ show err
-  Right val -> "Found " ++ show val
+  Left err -> String $ "No match: " ++ show err
+  Right val -> val
 
 data LispVal
   = Nil
@@ -228,3 +226,11 @@ parseExpr =
     <|> parseUnquoted
     <|> parseVector
     <|> parseList
+
+eval :: LispVal -> LispVal
+eval (List [Atom "quote", val]) = val
+eval (List [Atom "quasiquote", val]) = error "not support"
+eval (List [Atom "unquoted", val]) = error "not support"
+eval val@(Vector _) = error "not support"
+eval val@(List _) = error "not support"
+eval val = val
