@@ -285,8 +285,4 @@ numericBinop op params = Number $ foldl1 op $ map unpackNum params
 
 unpackNum :: LispVal -> Integer
 unpackNum (Number n) = n
-unpackNum (String s) =
-  let n = reads s :: [(Integer, String)]
-   in if null n then 0 else fst $ head n
-unpackNum (List [n]) = unpackNum n
-unpackNum val = error $ "invalid number: " ++ show val
+unpackNum _ = 0
