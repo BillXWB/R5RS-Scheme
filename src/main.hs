@@ -21,11 +21,7 @@ symbol = oneOf "!$%&|*+-/:<=>?@^_~"
 readExpr :: String -> String
 readExpr input = case parse parseExpr "lisp" input of
   Left err -> "No match: " ++ show err
-  Right val ->
-    "Found value: "
-      ++ case val of
-        String s -> "String " ++ s
-        v -> show v
+  Right val -> "Found " ++ show val
 
 data LispVal
   = Nil
@@ -40,7 +36,32 @@ data LispVal
   | String String
   | Char Char
   | Bool Bool
-  deriving (Show)
+
+showVal :: LispVal -> String
+showVal Nil = "nil"
+showVal (Atom a) = a
+showVal (Number n) = show n
+showVal (Float f) = show f
+showVal (Ratio r) = show (numerator r) ++ "/" ++ show (denominator r)
+showVal (Complex c) = show (realPart c) ++ "+" ++ show (imagPart c) ++ "i"
+showVal (String s) = "\"" ++ s ++ "\""
+showVal (Char c) =
+  "#\\" ++ case c of
+    ' ' -> "space"
+    '\n' -> "newline"
+    _ -> [c]
+showVal (Bool True) = "#t"
+showVal (Bool False) = "#f"
+showVal (List xs) = "(" ++ unwordsList xs ++ ")"
+showVal (DottedList heads tail) =
+  "(" ++ unwordsList heads ++ " . " ++ showVal tail ++ ")"
+showVal (Vector v) = "#(" ++ unwordsList (foldr (:) [] v) ++ ")"
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
+instance Show LispVal where
+  show = showVal
 
 parseString :: Parser LispVal
 parseString = do
@@ -146,7 +167,7 @@ parseComplex =
   let toDouble :: LispVal -> Double
       toDouble (Float x) = realToFrac x
       toDouble (Number x) = fromIntegral x
-      toDouble x = error $ "type error: " ++ (head . words $ show x)
+      toDouble x = error $ "type error: " ++ show x
    in do
         x <- try parseFloat <|> parseDec
         char '+'
