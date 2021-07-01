@@ -252,7 +252,9 @@ primitives =
     ("string?", unaryOp isString),
     ("number?", unaryOp isNumber),
     ("bool?", unaryOp isBool),
-    ("list?", unaryOp isList)
+    ("list?", unaryOp isList),
+    ("symbol->string", unaryOp symbol2string),
+    ("string->symbol", unaryOp string2symbol)
   ]
 
 unaryOp :: (LispVal -> LispVal) -> [LispVal] -> LispVal
@@ -279,6 +281,14 @@ isList :: LispVal -> LispVal
 isList (List _) = Bool True
 isList (DottedList _ _) = Bool True
 isList _ = Bool False
+
+symbol2string :: LispVal -> LispVal
+symbol2string (Atom i) = String i
+symbol2string val = error $ "type error: " ++ show val
+
+string2symbol :: LispVal -> LispVal
+string2symbol (String s) = Atom s
+string2symbol val = error $ "type error: " ++ show val
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
 numericBinop op params = Number $ foldl1 op $ map unpackNum params
