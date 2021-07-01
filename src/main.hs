@@ -233,6 +233,7 @@ eval (List [Atom "quasiquote", val]) = error "` is not support"
 eval (List [Atom "unquoted", val]) = error ", is not support"
 eval (List (Atom func : args)) = apply func $ map eval args
 eval val@(List _) = error $ "invalid form: " ++ show val
+eval val@(DottedList _ _) = error ". is not support"
 eval val = val
 
 apply :: String -> [LispVal] -> LispVal
@@ -246,8 +247,38 @@ primitives =
     ("/", numericBinop div),
     ("mod", numericBinop mod),
     ("quotient", numericBinop quot),
-    ("remainder", numericBinop rem)
+    ("remainder", numericBinop rem),
+    ("symbol?", unaryOp isSymbol),
+    ("string?", unaryOp isString),
+    ("number?", unaryOp isNumber),
+    ("bool?", unaryOp isBool),
+    ("list?", unaryOp isList)
   ]
+
+unaryOp :: (LispVal -> LispVal) -> [LispVal] -> LispVal
+unaryOp func [param] = func param
+unaryOp _ param = error $ "too many or too few arguments: " ++ show param
+
+isSymbol :: LispVal -> LispVal
+isSymbol (Atom _) = Bool True
+isSymbol _ = Bool False
+
+isString :: LispVal -> LispVal
+isString (String _) = Bool True
+isString _ = Bool False
+
+isNumber :: LispVal -> LispVal
+isNumber (Number _) = Bool True
+isNumber _ = Bool False
+
+isBool :: LispVal -> LispVal
+isBool (Bool _) = Bool True
+isBool _ = Bool False
+
+isList :: LispVal -> LispVal
+isList (List _) = Bool True
+isList (DottedList _ _) = Bool True
+isList _ = Bool False
 
 numericBinop :: (Integer -> Integer -> Integer) -> [LispVal] -> LispVal
 numericBinop op params = Number $ foldl1 op $ map unpackNum params
