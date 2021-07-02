@@ -324,6 +324,39 @@ eval (List [Atom "if", pred, conseq, alt]) = do
     Bool True -> eval conseq
     Bool False -> eval alt
     _ -> throwError $ TypeMismatch "boolean" result
+eval form@(List (Atom "cond" : clauses)) =
+  if null clauses
+    then
+      throwError $
+        BadSpecialForm "no true clause in cond expression: " form
+    else case head clauses of
+      List [Atom "else", expr] -> eval expr
+      List [test, expr] ->
+        eval $ List [Atom "if", test, expr, List (Atom "cond" : tail clauses)]
+      _ -> throwError $ BadSpecialForm "ill-formed cond expression: " form
+eval form@(List (Atom "case" : key : clauses)) =
+  if null clauses
+    then
+      throwError $
+        BadSpecialForm "no true clause in case expression: " form
+    else case head clauses of
+      List (Atom "else" : exprs) -> eval' exprs
+      List (List datums : exprs) -> do
+        result <- eval key
+        let equality =
+              any
+                ( \x ->
+                    let (Right (Bool res)) =
+                          eqv [result, x]
+                     in res
+                )
+                datums
+        if equality
+          then eval' exprs
+          else eval $ List (Atom "case" : key : tail clauses)
+      _ -> throwError $ BadSpecialForm "ill-formed case expression: " form
+  where
+    eval' exprs = mapM eval exprs <&> last
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 eval val@(List _) =
   throwError $ BadSpecialForm "Unrecognized special form" val
