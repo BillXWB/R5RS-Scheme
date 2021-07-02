@@ -1,3 +1,6 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Main where
 
 import Control.Monad.Except (MonadError (..))
@@ -121,12 +124,14 @@ instance Show LispError where
 
 type ThrowsError = Either LispError
 
+instance MonadFail ThrowsError where
+  fail message = error $ "unexpected error: " ++ message
+
 trapError :: (MonadError e m, Show e) => m String -> m String
 trapError action = catchError action $ return . show
 
 extractValue :: ThrowsError a -> a
-extractValue (Right val) = val
-extractValue (Left err) = error $ "unexpected error: " ++ show err
+extractValue val' = let (Right val) = val' in val
 
 parseString :: Parser LispVal
 parseString = do
@@ -358,7 +363,8 @@ primitives =
     ("cdr", cdr),
     ("cons", cons),
     ("eq?", eqv),
-    ("eqv?", eqv)
+    ("eqv?", eqv),
+    ("equal?", equal)
   ]
 
 unaryOp ::
@@ -490,3 +496,27 @@ eqv [List lhs, List rhs] =
     eqv' (lhs, rhs) = let (Right (Bool res)) = eqv [lhs, rhs] in res
 eqv [_, _] = return $ Bool False
 eqv val = throwError $ NumArgs 2 val
+
+data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
+
+unpackers :: [Unpacker]
+unpackers =
+  [ AnyUnpacker unpackNum,
+    AnyUnpacker unpackString,
+    AnyUnpacker unpackBool
+  ]
+
+equal :: [LispVal] -> ThrowsError LispVal
+equal args@[lhs, rhs] = do
+  primitiveEquals <- or <$> mapM (unpackEquals lhs rhs) unpackers
+  (Bool eqvEquals) <- eqv args
+  return $ Bool (primitiveEquals || eqvEquals)
+equal val = throwError $ NumArgs 2 val
+
+unpackEquals :: LispVal -> LispVal -> Unpacker -> ThrowsError Bool
+unpackEquals lhs' rhs' (AnyUnpacker unpacker) =
+  do
+    lhs <- unpacker lhs'
+    rhs <- unpacker rhs'
+    return $ lhs == rhs
+    `catchError` const (return False)
