@@ -353,7 +353,12 @@ primitives =
     ("string<?", strBoolBinop (<)),
     ("string>?", strBoolBinop (>)),
     ("string<=?", strBoolBinop (<=)),
-    ("string>=?", strBoolBinop (>=))
+    ("string>=?", strBoolBinop (>=)),
+    ("car", car),
+    ("cdr", cdr),
+    ("cons", cons),
+    ("eq?", eqv),
+    ("eqv?", eqv)
   ]
 
 unaryOp ::
@@ -442,3 +447,46 @@ boolBoolBinop = boolBinop unpackBool
 unpackBool :: LispVal -> ThrowsError Bool
 unpackBool (Bool b) = return b
 unpackBool val = throwError $ TypeMismatch "boolean" val
+
+car :: [LispVal] -> ThrowsError LispVal
+car [List (x : xs)] = return x
+car [DottedList (x : xs) _] = return x
+car [val] = throwError $ TypeMismatch "pair" val
+car val = throwError $ NumArgs 1 val
+
+cdr :: [LispVal] -> ThrowsError LispVal
+cdr [List (_ : xs)] = return $ List xs
+cdr [DottedList [_] x] = return x
+cdr [DottedList (_ : xs) x] = return $ DottedList xs x
+cdr [val] = throwError $ TypeMismatch "pair" val
+cdr val = throwError $ NumArgs 1 val
+
+cons :: [LispVal] -> ThrowsError LispVal
+cons [x, List xs] = return $ List (x : xs)
+cons [x, DottedList xs y] = return $ DottedList (x : xs) y
+cons [x, y] = return $ DottedList [x] y
+cons val = throwError $ NumArgs 1 val
+
+eqv :: [LispVal] -> ThrowsError LispVal
+eqv [Nil, Nil] = return $ Bool True
+eqv [Atom lhs, Atom rhs] = return $ Bool (lhs == rhs)
+eqv [Number lhs, Number rhs] = return $ Bool (lhs == rhs)
+eqv [Float lhs, Float rhs] = return $ Bool (lhs == rhs)
+eqv [Ratio lhs, Ratio rhs] = return $ Bool (lhs == rhs)
+eqv [Complex lhs, Complex rhs] = return $ Bool (lhs == rhs)
+eqv [String lhs, String rhs] = return $ Bool (lhs == rhs)
+eqv [Char lhs, Char rhs] = return $ Bool (lhs == rhs)
+eqv [Bool lhs, Bool rhs] = return $ Bool (lhs == rhs)
+eqv [Vector lhs, Vector rhs] = eqv [toList lhs, toList rhs]
+  where
+    toList arr = List $ foldr (:) [] arr
+eqv [DottedList lhs lhs', DottedList rhs rhs'] =
+  eqv [toList lhs lhs', toList rhs rhs']
+  where
+    toList xs y = List $ xs ++ [y]
+eqv [List lhs, List rhs] =
+  return . Bool $ (length lhs == length rhs) && all eqv' (zip lhs rhs)
+  where
+    eqv' (lhs, rhs) = let (Right (Bool res)) = eqv [lhs, rhs] in res
+eqv [_, _] = return $ Bool False
+eqv val = throwError $ NumArgs 2 val
