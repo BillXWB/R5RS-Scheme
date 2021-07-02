@@ -307,6 +307,11 @@ eval :: LispVal -> ThrowsError LispVal
 eval (List [Atom "quote", val]) = return val
 eval (List [Atom "quasiquote", val]) = throwError $ Default "` is not support"
 eval (List [Atom "unquoted", val]) = throwError $ Default ", is not support"
+eval (List [Atom "if", pred, conseq, alt]) = do
+  result <- eval pred
+  case result of
+    Bool False -> eval alt
+    _ -> eval conseq
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 eval val@(List _) =
   throwError $ BadSpecialForm "Unrecognized special form" val
