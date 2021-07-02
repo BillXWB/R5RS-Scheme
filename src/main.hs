@@ -7,7 +7,33 @@ import Data.Functor ((<&>))
 import Data.Ratio (denominator, numerator, (%))
 import Numeric (readFloat, readHex, readOct)
 import System.Environment (getArgs)
-import Text.ParserCombinators.Parsec hiding (spaces)
+import Text.ParserCombinators.Parsec
+  ( ParseError,
+    Parser,
+    alphaNum,
+    anyChar,
+    between,
+    char,
+    digit,
+    hexDigit,
+    letter,
+    many,
+    many1,
+    noneOf,
+    notFollowedBy,
+    octDigit,
+    oneOf,
+    option,
+    parse,
+    sepBy,
+    sepEndBy,
+    skipMany,
+    skipMany1,
+    space,
+    string,
+    try,
+    (<|>),
+  )
 
 main :: IO ()
 main = do
@@ -309,7 +335,20 @@ primitives =
     ("bool?", unaryOp $ return . isBool),
     ("list?", unaryOp $ return . isList),
     ("symbol->string", unaryOp symbol2string),
-    ("string->symbol", unaryOp string2symbol)
+    ("string->symbol", unaryOp string2symbol),
+    ("=", numBoolBinop (==)),
+    ("<", numBoolBinop (<)),
+    (">", numBoolBinop (>)),
+    ("/=", numBoolBinop (/=)),
+    (">=", numBoolBinop (>=)),
+    ("<=", numBoolBinop (<=)),
+    ("&&", boolBoolBinop (&&)),
+    ("||", boolBoolBinop (||)),
+    ("string=?", strBoolBinop (==)),
+    ("string<?", strBoolBinop (<)),
+    ("string>?", strBoolBinop (>)),
+    ("string<=?", strBoolBinop (<=)),
+    ("string>=?", strBoolBinop (>=))
   ]
 
 unaryOp ::
@@ -365,3 +404,36 @@ unpackNum val@(String s) =
         else return $ fst . head $ parsed
 unpackNum (List [n]) = unpackNum n
 unpackNum val = throwError $ TypeMismatch "number" val
+
+boolBinop ::
+  (LispVal -> ThrowsError a) ->
+  (a -> a -> Bool) ->
+  [LispVal] ->
+  ThrowsError LispVal
+boolBinop unpacker op args
+  | length args /= 2 = throwError $ NumArgs 2 args
+  | otherwise = do
+    lhs <- unpacker $ head args
+    rhs <- unpacker $ last args
+    return $ Bool $ lhs `op` rhs
+
+numBoolBinop ::
+  (Integer -> Integer -> Bool) ->
+  [LispVal] ->
+  ThrowsError LispVal
+numBoolBinop = boolBinop unpackNum
+
+strBoolBinop :: (String -> String -> Bool) -> [LispVal] -> ThrowsError LispVal
+strBoolBinop = boolBinop unpackString
+
+unpackString :: LispVal -> ThrowsError String
+unpackString (String s) = return s
+unpackString (Number n) = return $ show n
+unpackString val = throwError $ TypeMismatch "string" val
+
+boolBoolBinop :: (Bool -> Bool -> Bool) -> [LispVal] -> ThrowsError LispVal
+boolBoolBinop = boolBinop unpackBool
+
+unpackBool :: LispVal -> ThrowsError Bool
+unpackBool (Bool b) = return b
+unpackBool val = throwError $ TypeMismatch "boolean" val
