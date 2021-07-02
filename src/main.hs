@@ -386,6 +386,8 @@ primitives =
     ("list?", unaryOp $ return . isList),
     ("symbol->string", unaryOp symbol2string),
     ("string->symbol", unaryOp string2symbol),
+    ("string-length", unaryOp stringLength),
+    ("string-ref", stringRef),
     ("=", numBoolBinop (==)),
     ("<", numBoolBinop (<)),
     (">", numBoolBinop (>)),
@@ -442,6 +444,19 @@ symbol2string val = throwError $ TypeMismatch "atom" val
 string2symbol :: LispVal -> ThrowsError LispVal
 string2symbol (String s) = return $ Atom s
 string2symbol val = throwError $ TypeMismatch "string" val
+
+stringLength :: LispVal -> ThrowsError LispVal
+stringLength (String s) = return . Number $ toInteger . length $ s
+stringLength val = throwError $ TypeMismatch "string" val
+
+stringRef :: [LispVal] -> ThrowsError LispVal
+stringRef [String s, Number i]
+  | i `elem` [0 .. toInteger (length s) - 1] =
+    return . Char $ s !! fromInteger i
+  | otherwise = throwError $ Default "index out of bound"
+stringRef [String _, val] = throwError $ TypeMismatch "number" val
+stringRef [val, _] = throwError $ TypeMismatch "string" val
+stringRef val = throwError $ NumArgs 2 val
 
 numericBinop ::
   (Integer -> Integer -> Integer) ->
