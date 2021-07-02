@@ -315,8 +315,9 @@ eval (List [Atom "unquoted", val]) = throwError $ Default ", is not support"
 eval (List [Atom "if", pred, conseq, alt]) = do
   result <- eval pred
   case result of
+    Bool True -> eval conseq
     Bool False -> eval alt
-    _ -> eval conseq
+    _ -> throwError $ TypeMismatch "boolean" result
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 eval val@(List _) =
   throwError $ BadSpecialForm "Unrecognized special form" val
