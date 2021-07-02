@@ -38,6 +38,9 @@ import Text.ParserCombinators.Parsec
     (<|>),
   )
 
+arrayList :: Array i e -> [e]
+arrayList = foldr (:) []
+
 main :: IO ()
 main = do
   args <- getArgs
@@ -68,6 +71,9 @@ data LispVal
   | String String
   | Char Char
   | Bool Bool
+
+dotted2List :: [LispVal] -> LispVal -> LispVal
+dotted2List xs y = List $ xs ++ [y]
 
 showVal :: LispVal -> String
 showVal Nil = "nil"
@@ -484,19 +490,23 @@ eqv [Complex lhs, Complex rhs] = return $ Bool (lhs == rhs)
 eqv [String lhs, String rhs] = return $ Bool (lhs == rhs)
 eqv [Char lhs, Char rhs] = return $ Bool (lhs == rhs)
 eqv [Bool lhs, Bool rhs] = return $ Bool (lhs == rhs)
-eqv [Vector lhs, Vector rhs] = eqv [toList lhs, toList rhs]
-  where
-    toList arr = List $ foldr (:) [] arr
+eqv [Vector lhs, Vector rhs] =
+  eqv [List $ arrayList lhs, List $ arrayList rhs]
 eqv [DottedList lhs lhs', DottedList rhs rhs'] =
-  eqv [toList lhs lhs', toList rhs rhs']
-  where
-    toList xs y = List $ xs ++ [y]
-eqv [List lhs, List rhs] =
-  return . Bool $ (length lhs == length rhs) && all eqv' (zip lhs rhs)
-  where
-    eqv' (lhs, rhs) = let (Right (Bool res)) = eqv [lhs, rhs] in res
+  eqv [dotted2List lhs lhs', dotted2List rhs rhs']
+eqv [List lhs, List rhs] = eqList eqv lhs rhs
 eqv [_, _] = return $ Bool False
 eqv val = throwError $ NumArgs 2 val
+
+eqList ::
+  ([LispVal] -> ThrowsError LispVal) ->
+  [LispVal] ->
+  [LispVal] ->
+  ThrowsError LispVal
+eqList eq lhs rhs =
+  return . Bool $ (length lhs == length rhs) && all eq' (zip lhs rhs)
+  where
+    eq' (lhs, rhs) = let (Right (Bool res)) = eq [lhs, rhs] in res
 
 data Unpacker = forall a. Eq a => AnyUnpacker (LispVal -> ThrowsError a)
 
@@ -508,6 +518,11 @@ unpackers =
   ]
 
 equal :: [LispVal] -> ThrowsError LispVal
+equal [Vector lhs, Vector rhs] =
+  equal [List $ arrayList lhs, List $ arrayList rhs]
+equal [DottedList lhs lhs', DottedList rhs rhs'] =
+  equal [dotted2List lhs lhs', dotted2List rhs rhs']
+equal [List lhs, List rhs] = eqList equal lhs rhs
 equal args@[lhs, rhs] = do
   primitiveEquals <- or <$> mapM (unpackEquals lhs rhs) unpackers
   (Bool eqvEquals) <- eqv args
