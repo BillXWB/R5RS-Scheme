@@ -10,6 +10,7 @@ import Data.Functor ((<&>))
 import Data.Ratio (denominator, numerator, (%))
 import Numeric (readFloat, readHex, readOct)
 import System.Environment (getArgs)
+import System.IO
 import Text.ParserCombinators.Parsec
   ( ParseError,
     Parser,
@@ -41,11 +42,38 @@ import Text.ParserCombinators.Parsec
 arrayList :: Array i e -> [e]
 arrayList = foldr (:) []
 
+until_ :: Monad m => (a -> Bool) -> m a -> (a -> m ()) -> m ()
+until_ pred prompt action = do
+  result <- prompt
+  if pred result
+    then return ()
+    else action result >> until_ pred prompt action
+
 main :: IO ()
 main = do
   args <- getArgs
-  let evaled = show <$> (readExpr (head args) >>= eval)
-  putStrLn $ extractValue $ trapError evaled
+  case args of
+    [] -> runRepl
+    [arg] -> evalAndPrint arg
+    _ -> putStrLn "Program takes only 0 or 1 argument"
+
+runRepl :: IO ()
+runRepl = until_ (== "quit") (readPrompt "Lisp>>> ") evalAndPrint
+
+flushStr :: String -> IO ()
+flushStr str = putStr str >> hFlush stdout
+
+readPrompt :: String -> IO String
+readPrompt prompt = flushStr prompt >> getLine
+
+evalString :: String -> IO String
+evalString expr =
+  return $
+    extractValue . trapError $
+      show <$> (readExpr expr >>= eval)
+
+evalAndPrint :: String -> IO ()
+evalAndPrint expr = evalString expr >>= putStrLn
 
 spaces :: Parser ()
 spaces = skipMany1 space
