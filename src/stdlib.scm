@@ -138,3 +138,5 @@
         '() lst
     )
 )
+
+"Loaded the Standard Library."
